@@ -1,0 +1,20 @@
+{
+  "name": "Voiles & Company",
+  "short_name": "Voiles & Co",
+  "icons": [
+    {
+      "src": "/favicon-32x32.png",
+      "sizes": "32x32",
+      "type": "image/png"
+    },
+    {
+      "src": "/favicon_128x128.png",
+      "sizes": "128x128",
+      "type": "image/png"
+    }
+  ],
+  "start_url": "https://voilesandco.com",
+  "theme_color": "#0b2a3a",
+  "background_color": "#0b2a3a",
+  "display": "standalone"
+}

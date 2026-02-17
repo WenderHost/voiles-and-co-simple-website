@@ -21,6 +21,11 @@ if (!is_readable($config_path)) {
   <title>Voiles & Company | Accounting Firm in Knoxville, TN</title>
   <meta name="description" content="Voiles & Company is an accounting firm in Knoxville, TN providing tax preparation, financial statements, and bookkeeping services for businesses and individuals." />
   <meta name="theme-color" content="#0b2a3a" />
+  <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+  <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
+  <link rel="icon" type="image/png" sizes="128x128" href="/favicon_128x128.png" />
+  <link rel="shortcut icon" href="/favicon.ico" />
+  <link rel="manifest" href="/site.webmanifest" />
   <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   <style>
     :root{
