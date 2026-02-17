@@ -646,7 +646,7 @@ if (!is_readable($config_path)) {
               <p>
                 <strong>Voiles &amp; Company</strong><br/>
                 5401 Kingston Pike, Suite 280<br/>
-                Knoxville, TN
+                Knoxville, TN 37919
               </p>
 
               <p>
