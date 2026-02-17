@@ -131,17 +131,24 @@ $text_body = "New Contact Inquiry\n\n"
   . "Service needed: " . ($service !== '' ? $service : 'Not specified') . "\n\n"
   . "Message:\n" . ($message !== '' ? $message : 'No message provided.') . "\n";
 
-$sender_name = trim($config['from_name'] ?? '');
 $sender_email = trim($config['from_email']);
+$sender_name = trim(str_replace(["\r", "\n"], '', $name));
 $sender = $sender_email;
 if ($sender_name !== '') {
   $sender = $sender_name . ' <' . $sender_email . '>';
 }
+$reply_to = trim(str_replace(["\r", "\n"], '', $email));
 
 $email_payload = [
   'sender' => $sender,
   'to' => [$config['contact_to']],
   'subject' => $subject,
+  'custom_headers' => [
+    [
+      'header' => 'Reply-To',
+      'value' => $reply_to
+    ]
+  ],
   'html_body' => $html_body,
   'text_body' => $text_body
 ];
