@@ -17,12 +17,14 @@ if ($_SERVER['REQUEST_METHOD'] !== 'POST') {
   ]);
 }
 
-$config_path = dirname(__DIR__, 3) . '/config.php';
+$webroot = dirname(__DIR__, 2);
+$config_path = dirname($webroot) . '/config.php';
+$config_relative = '..' . DIRECTORY_SEPARATOR . basename($config_path);
 if (!is_readable($config_path)) {
   json_response(500, [
     'ok' => false,
     'error' => 'Missing config.php. Create it one directory above the webroot and add your SMTP2GO and Turnstile settings.',
-    'instructions' => 'Expected: /Users/mwender/webdev/laravel-valet/voilesandco.com/config.php'
+    'instructions' => "Expected: {$config_relative}"
   ]);
 }
 
@@ -34,7 +36,7 @@ if (!is_array($config)) {
   ]);
 }
 
-$required = ['smtp2go_api_key', 'contact_to', 'from_email', 'from_name', 'turnstile_secret'];
+$required = ['smtp2go_api_key', 'contact_to', 'from_email', 'from_name', 'email_subject', 'turnstile_secret'];
 foreach ($required as $key) {
   if (empty($config[$key])) {
     json_response(500, [
@@ -96,7 +98,10 @@ if ($verify_http !== 200 || empty($verify_data['success'])) {
   ]);
 }
 
-$subject = 'New contact inquiry from ' . $name;
+$subject_template = trim($config['email_subject'] ?? '');
+$subject = strtr($subject_template, [
+  '{name}' => $name
+]);
 $clean_name = htmlspecialchars($name, ENT_QUOTES, 'UTF-8');
 $clean_email = htmlspecialchars($email, ENT_QUOTES, 'UTF-8');
 $clean_service = htmlspecialchars($service, ENT_QUOTES, 'UTF-8');
