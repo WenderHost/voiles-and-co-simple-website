@@ -1,3 +1,18 @@
+<?php
+$turnstile_site_key = '';
+$config_error = '';
+$config_path = dirname(__DIR__) . '/config.php';
+if (!is_readable($config_path)) {
+  $config_error = 'Missing config.php. Create it one directory above the webroot to enable the contact form.';
+} else {
+  $config = require $config_path;
+  if (!is_array($config) || empty($config['turnstile_site_key'])) {
+    $config_error = 'Missing turnstile_site_key in config.php. Update your config to enable the contact form.';
+  } else {
+    $turnstile_site_key = $config['turnstile_site_key'];
+  }
+}
+?>
 <!doctype html>
 <html lang="en">
 <head>
@@ -6,6 +21,7 @@
   <title>Voiles & Company | Accounting Firm in Knoxville, TN</title>
   <meta name="description" content="Voiles & Company is an accounting firm in Knoxville, TN providing tax preparation, financial statements, and bookkeeping services for businesses and individuals." />
   <meta name="theme-color" content="#0b2a3a" />
+  <script src="https://challenges.cloudflare.com/turnstile/v0/api.js" async defer></script>
   <style>
     :root{
       --bg: #071a24;
@@ -328,6 +344,7 @@
       align-items:start;
     }
     form{ display:grid; gap: 10px; }
+    .form-note{ font-size: 13px; color: var(--muted2); }
     label{ font-size: 12px; color: var(--muted); }
     input, textarea{
       width:100%;
@@ -592,7 +609,7 @@
           <div class="panel">
             <div class="panel-inner">
               <h3>Send a message</h3>
-              <form onsubmit="return handleSubmit(event)">
+              <form id="contact-us" action="/lib/scripts/contact.php" method="post" novalidate>
                 <div>
                   <label for="name">Name</label>
                   <input id="name" name="name" autocomplete="name" required />
@@ -609,6 +626,14 @@
                   <label for="message">Message</label>
                   <textarea id="message" name="message" placeholder="A few details helps us route you correctly."></textarea>
                 </div>
+                <?php if ($config_error !== ''): ?>
+                  <div id="formNote" class="form-note" aria-live="polite" style="color: rgba(255,140,140,.95);">
+                    <?php echo htmlspecialchars($config_error, ENT_QUOTES, 'UTF-8'); ?>
+                  </div>
+                <?php else: ?>
+                  <div class="cf-turnstile" data-sitekey="<?php echo htmlspecialchars($turnstile_site_key, ENT_QUOTES, 'UTF-8'); ?>"></div>
+                  <div id="formNote" class="form-note" aria-live="polite"></div>
+                <?php endif; ?>
                 <button class="btn primary" type="submit">Send Inquiry</button>
 
               </form>
@@ -675,14 +700,58 @@
       document.getElementById('year').textContent = new Date().getFullYear();
     })();
 
-    // Demo form handler (front-end only)
-    function handleSubmit(e){
-      e.preventDefault();
+    // Contact form handler
+    (function () {
+      const form = document.getElementById('contact-us');
+      if (!form) { return; }
+
       const note = document.getElementById('formNote');
-      note.textContent = "Thanks! This is a demo form—hook it to your backend or form service to receive submissions.";
-      note.style.color = "rgba(121,255,168,.9)";
-      return false;
-    }
+      const submitBtn = form.querySelector('button[type="submit"]');
+
+      form.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        if (submitBtn) { submitBtn.disabled = true; }
+        if (note) {
+          note.textContent = "Sending your message...";
+          note.style.color = "rgba(255,255,255,.72)";
+        }
+
+        try {
+          const response = await fetch(form.action, {
+            method: "POST",
+            body: new FormData(form),
+            headers: { "Accept": "application/json" }
+          });
+
+          const data = await response.json().catch(() => ({}));
+          if (response.ok && data.ok) {
+            if (note) {
+              note.textContent = "Thanks! Your message has been sent. We'll be in touch soon.";
+              note.style.color = "rgba(121,255,168,.9)";
+            }
+            form.reset();
+            if (window.turnstile && typeof window.turnstile.reset === "function") {
+              window.turnstile.reset();
+            }
+          } else {
+            if (note) {
+              note.textContent = data.error || "Sorry, we couldn't send your message. Please try again.";
+              note.style.color = "rgba(255,140,140,.95)";
+            }
+            if (data.turnstile_reset && window.turnstile && typeof window.turnstile.reset === "function") {
+              window.turnstile.reset();
+            }
+          }
+        } catch (err) {
+          if (note) {
+            note.textContent = "Network error. Please try again in a moment.";
+            note.style.color = "rgba(255,140,140,.95)";
+          }
+        } finally {
+          if (submitBtn) { submitBtn.disabled = false; }
+        }
+      });
+    })();
   </script>
 </body>
 </html>
