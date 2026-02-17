@@ -24,7 +24,7 @@
     }
 
     *{ box-sizing:border-box; }
-    html,body{ height:100%; }
+    html,body{ min-height:100%; }
     body{
       margin:0;
       font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, "Apple Color Emoji","Segoe UI Emoji";
@@ -558,9 +558,6 @@
               <p>
                 We work with businesses that want dependable bookkeeping and financial reporting, and individuals who want
                 tax preparation handled accurately and efficiently.
-              </p>
-              <p class="fineprint">
-                Replace with specifics if you want: industries served, years in business, credentials, and any software you specialize in.
               </p>
             </div>
           </div>
