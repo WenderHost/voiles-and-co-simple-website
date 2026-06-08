@@ -174,6 +174,16 @@ if ($send_http !== 200 || empty($send_data['data']['succeeded']) || $send_data['
   ]);
 }
 
+$app_root = dirname(__DIR__, 3);
+require_once $app_root . '/lib/db.php';
+try {
+  $db   = get_db($app_root);
+  $stmt = $db->prepare('INSERT INTO submissions (name, email, service, message, ip) VALUES (?, ?, ?, ?, ?)');
+  $stmt->execute([$name, $email, $service, $message, $_SERVER['REMOTE_ADDR'] ?? '']);
+} catch (Exception $e) {
+  error_log('voilesandco contact DB: ' . $e->getMessage());
+}
+
 json_response(200, [
   'ok' => true
 ]);
