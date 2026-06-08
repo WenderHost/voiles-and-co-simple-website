@@ -125,11 +125,17 @@ if (empty($_SESSION['admin_authed'])) {
   exit;
 }
 
-// Authenticated — handle POST actions
+// Authenticated — open DB
 require_once $app_root . '/lib/db.php';
-$db = get_db($app_root);
+$db       = null;
+$db_error = '';
+try {
+  $db = get_db($app_root);
+} catch (Exception $e) {
+  $db_error = $e->getMessage();
+}
 
-if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+if ($db !== null && $_SERVER['REQUEST_METHOD'] === 'POST') {
   $action = $_POST['action'] ?? '';
   $id     = (int)($_POST['id'] ?? 0);
   if ($action === 'toggle_read' && $id > 0) {
@@ -143,9 +149,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
   exit;
 }
 
-$submissions = $db->query('SELECT * FROM submissions ORDER BY submitted_at DESC')->fetchAll(PDO::FETCH_ASSOC);
-$total  = count($submissions);
-$unread = count(array_filter($submissions, fn($r) => !$r['is_read']));
+$submissions = [];
+$total       = 0;
+$unread      = 0;
+if ($db !== null) {
+  $submissions = $db->query('SELECT * FROM submissions ORDER BY submitted_at DESC')->fetchAll(PDO::FETCH_ASSOC);
+  $total       = count($submissions);
+  $unread      = count(array_filter($submissions, fn($r) => !$r['is_read']));
+}
 ?>
 <!doctype html>
 <html lang="en">
@@ -226,6 +237,22 @@ $unread = count(array_filter($submissions, fn($r) => !$r['is_read']));
       padding: 72px 20px;
       color: var(--muted);
       font-size: 15px;
+    }
+    .db-error {
+      display: grid;
+      gap: 10px;
+      padding: 20px 22px;
+      border-radius: var(--radius);
+      background: rgba(255,100,100,.07);
+      border: 1px solid rgba(255,100,100,.25);
+      color: var(--danger);
+    }
+    .db-error strong { font-size: 15px; }
+    .db-error code {
+      font-family: ui-monospace, monospace;
+      font-size: 13px;
+      color: rgba(255,180,180,.85);
+      word-break: break-word;
     }
 
     .submissions { display: grid; gap: 8px; }
@@ -345,7 +372,12 @@ $unread = count(array_filter($submissions, fn($r) => !$r['is_read']));
 
   <main>
     <div class="wrap">
-      <?php if ($total === 0): ?>
+      <?php if ($db_error !== ''): ?>
+        <div class="db-error">
+          <strong>Storage unavailable</strong>
+          <code><?= htmlspecialchars($db_error, ENT_QUOTES, 'UTF-8') ?></code>
+        </div>
+      <?php elseif ($total === 0): ?>
         <div class="empty">No submissions yet.</div>
       <?php else: ?>
         <div class="submissions">

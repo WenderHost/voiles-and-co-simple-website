@@ -1,5 +1,8 @@
 <?php
 function get_db(string $app_root): PDO {
+  if (!in_array('sqlite', PDO::getAvailableDrivers(), true)) {
+    throw new RuntimeException('pdo_sqlite is not enabled. Run: sudo apt install php-sqlite3 -y && sudo systemctl restart php-fpm');
+  }
   $data_dir = $app_root . '/data';
   if (!is_dir($data_dir)) {
     mkdir($data_dir, 0755, true);
