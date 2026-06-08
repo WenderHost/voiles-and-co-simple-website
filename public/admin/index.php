@@ -138,6 +138,13 @@ try {
 if ($db !== null && $_SERVER['REQUEST_METHOD'] === 'POST') {
   $action = $_POST['action'] ?? '';
   $id     = (int)($_POST['id'] ?? 0);
+  if ($action === 'mark_read' && $id > 0) {
+    $stmt = $db->prepare('UPDATE submissions SET is_read = 1 WHERE id = ?');
+    $stmt->execute([$id]);
+    header('Content-Type: application/json');
+    echo json_encode(['ok' => true]);
+    exit;
+  }
   if ($action === 'toggle_read' && $id > 0) {
     $stmt = $db->prepare('UPDATE submissions SET is_read = CASE WHEN is_read = 1 THEN 0 ELSE 1 END WHERE id = ?');
     $stmt->execute([$id]);
@@ -383,7 +390,7 @@ if ($db !== null) {
         <div class="submissions">
           <?php foreach ($submissions as $sub): ?>
             <?php $unread_row = !$sub['is_read']; ?>
-            <details class="sub <?= $unread_row ? 'unread' : '' ?>" id="sub-<?= (int)$sub['id'] ?>">
+            <details class="sub <?= $unread_row ? 'unread' : '' ?>" id="sub-<?= (int)$sub['id'] ?>" data-read="<?= $sub['is_read'] ? '1' : '0' ?>">
               <summary>
                 <div class="sum-row">
                   <span class="sum-name"><?= htmlspecialchars($sub['name'], ENT_QUOTES, 'UTF-8') ?></span>
@@ -438,5 +445,41 @@ if ($db !== null) {
       <?php endif; ?>
     </div>
   </main>
+
+  <script>
+    (function () {
+      var badge = document.querySelector('.badge');
+
+      function updateBadge(delta) {
+        var n = Math.max(0, (parseInt(badge.textContent, 10) || 0) + delta);
+        badge.textContent = n + ' unread';
+        badge.classList.toggle('zero', n === 0);
+      }
+
+      document.querySelectorAll('details.sub').forEach(function (details) {
+        details.addEventListener('toggle', function () {
+          if (!details.open || details.dataset.read === '1') return;
+
+          var fd = new FormData();
+          fd.append('action', 'mark_read');
+          fd.append('id', details.id.replace('sub-', ''));
+
+          fetch('', { method: 'POST', body: fd })
+            .then(function (r) { return r.json(); })
+            .then(function (data) {
+              if (!data.ok) return;
+              details.dataset.read = '1';
+              details.classList.remove('unread');
+              var tag = details.querySelector('.tag');
+              if (tag) { tag.className = 'tag tag-read'; tag.textContent = 'Read'; }
+              var btn = details.querySelector('.btn-read');
+              if (btn) { btn.textContent = 'Mark as unread'; }
+              updateBadge(-1);
+            })
+            .catch(function () {});
+        });
+      });
+    })();
+  </script>
 </body>
 </html>
