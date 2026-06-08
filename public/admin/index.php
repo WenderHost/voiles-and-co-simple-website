@@ -1,4 +1,6 @@
 <?php
+session_start();
+
 $app_root = dirname(__DIR__, 2);
 $config_path = $app_root . '/config.php';
 if (!is_readable($config_path)) {
@@ -11,16 +13,119 @@ if (empty($config['admin_user']) || empty($config['admin_password'])) {
   exit('Admin unavailable: add admin_user and admin_password to config.php');
 }
 
-if (
-  empty($_SERVER['PHP_AUTH_USER']) ||
-  !hash_equals($config['admin_user'], $_SERVER['PHP_AUTH_USER']) ||
-  !hash_equals($config['admin_password'], $_SERVER['PHP_AUTH_PW'] ?? '')
-) {
-  header('WWW-Authenticate: Basic realm="Voiles Admin"');
-  http_response_code(401);
-  exit('Unauthorized');
+// Logout
+if (isset($_GET['logout'])) {
+  session_destroy();
+  header('Location: ' . strtok($_SERVER['REQUEST_URI'], '?'));
+  exit;
 }
 
+// Login POST
+$login_error = '';
+if (!isset($_SESSION['admin_authed']) && $_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['username'])) {
+  if (
+    hash_equals($config['admin_user'], $_POST['username'] ?? '') &&
+    hash_equals($config['admin_password'], $_POST['password'] ?? '')
+  ) {
+    session_regenerate_id(true);
+    $_SESSION['admin_authed'] = true;
+    header('Location: ' . strtok($_SERVER['REQUEST_URI'], '?'));
+    exit;
+  }
+  $login_error = 'Invalid username or password.';
+}
+
+// Gate
+if (empty($_SESSION['admin_authed'])) {
+?>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Admin Login — Voiles &amp; Co.</title>
+  <style>
+    :root {
+      --bg:    #071a24;
+      --text:  rgba(255,255,255,.92);
+      --muted: rgba(255,255,255,.6);
+      --line:  rgba(255,255,255,.12);
+      --brand: #41d3ff;
+      --danger: rgba(255,140,140,.95);
+    }
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      font-size: 15px;
+    }
+    .card {
+      width: 100%;
+      max-width: 360px;
+      background: rgba(255,255,255,.06);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      padding: 32px 28px;
+      margin: 20px;
+    }
+    h1 { margin: 0 0 6px; font-size: 18px; }
+    .sub { margin: 0 0 24px; font-size: 13px; color: var(--muted); }
+    label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 4px; }
+    input {
+      width: 100%;
+      padding: 11px 13px;
+      border-radius: 12px;
+      border: 1px solid var(--line);
+      background: rgba(0,0,0,.2);
+      color: var(--text);
+      font-size: 15px;
+      outline: none;
+      margin-bottom: 14px;
+    }
+    input:focus { border-color: rgba(65,211,255,.45); box-shadow: 0 0 0 4px rgba(65,211,255,.10); }
+    .btn {
+      width: 100%;
+      padding: 11px;
+      border-radius: 12px;
+      border: 1px solid rgba(65,211,255,.35);
+      background: linear-gradient(135deg, rgba(65,211,255,.28), rgba(121,255,168,.18));
+      color: var(--text);
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity .15s ease;
+    }
+    .btn:hover { opacity: .88; }
+    .error { font-size: 13px; color: var(--danger); margin-bottom: 14px; }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <h1>Voiles &amp; Co.</h1>
+    <p class="sub">Admin — sign in to continue</p>
+    <?php if ($login_error !== ''): ?>
+      <div class="error"><?= htmlspecialchars($login_error, ENT_QUOTES, 'UTF-8') ?></div>
+    <?php endif; ?>
+    <form method="post">
+      <label for="username">Username</label>
+      <input id="username" name="username" autocomplete="username" required autofocus />
+      <label for="password">Password</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required />
+      <button class="btn" type="submit">Sign in</button>
+    </form>
+  </div>
+</body>
+</html>
+<?php
+  exit;
+}
+
+// Authenticated — handle POST actions
 require_once $app_root . '/lib/db.php';
 $db = get_db($app_root);
 
@@ -88,6 +193,8 @@ $unread = count(array_filter($submissions, fn($r) => !$r['is_read']));
     header h1 { margin: 0; font-size: 17px; font-weight: 700; letter-spacing: .3px; }
     header p  { margin: 3px 0 0; font-size: 13px; color: var(--muted); }
 
+    .hright { display: flex; align-items: center; gap: 12px; }
+
     .badge {
       display: inline-block;
       padding: 4px 12px;
@@ -104,6 +211,15 @@ $unread = count(array_filter($submissions, fn($r) => !$r['is_read']));
       border-color: var(--line);
       color: var(--muted);
     }
+    .logout {
+      font-size: 12px;
+      color: var(--muted);
+      padding: 5px 10px;
+      border-radius: 8px;
+      border: 1px solid var(--line);
+      transition: background .15s ease;
+    }
+    .logout:hover { background: rgba(255,255,255,.06); color: var(--text); text-decoration: none; }
 
     .empty {
       text-align: center;
@@ -137,10 +253,10 @@ $unread = count(array_filter($submissions, fn($r) => !$r['is_read']));
       gap: 12px;
       align-items: center;
     }
-    .sum-name  { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .sum-email { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sum-name    { font-weight: 600; font-size: 14px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sum-email   { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .sum-service { font-size: 12px; color: var(--muted2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .sum-date  { font-size: 12px; color: var(--muted); white-space: nowrap; }
+    .sum-date    { font-size: 12px; color: var(--muted); white-space: nowrap; }
 
     .tag {
       font-size: 11px;
@@ -197,10 +313,10 @@ $unread = count(array_filter($submissions, fn($r) => !$r['is_read']));
       cursor: pointer;
       transition: background .15s ease;
     }
-    .btn:hover { background: rgba(255,255,255,.11); }
-    .btn-read   { border-color: rgba(121,255,168,.3); background: rgba(121,255,168,.08); color: var(--brand2); }
-    .btn-read:hover   { background: rgba(121,255,168,.14); }
-    .btn-delete { border-color: rgba(255,100,100,.3); background: rgba(255,100,100,.07); color: var(--danger); }
+    .btn:hover      { background: rgba(255,255,255,.11); }
+    .btn-read       { border-color: rgba(121,255,168,.3); background: rgba(121,255,168,.08); color: var(--brand2); }
+    .btn-read:hover { background: rgba(121,255,168,.14); }
+    .btn-delete       { border-color: rgba(255,100,100,.3); background: rgba(255,100,100,.07); color: var(--danger); }
     .btn-delete:hover { background: rgba(255,100,100,.13); }
 
     @media (max-width: 640px) {
@@ -219,7 +335,10 @@ $unread = count(array_filter($submissions, fn($r) => !$r['is_read']));
           <h1>Voiles &amp; Co. — Contact Submissions</h1>
           <p><?= $total ?> total submission<?= $total !== 1 ? 's' : '' ?></p>
         </div>
-        <div class="badge <?= $unread === 0 ? 'zero' : '' ?>"><?= $unread ?> unread</div>
+        <div class="hright">
+          <div class="badge <?= $unread === 0 ? 'zero' : '' ?>"><?= $unread ?> unread</div>
+          <a class="logout" href="?logout=1">Sign out</a>
+        </div>
       </div>
     </div>
   </header>
