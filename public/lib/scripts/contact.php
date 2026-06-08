@@ -67,35 +67,39 @@ if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
   ]);
 }
 
-if ($turnstile_token === '') {
-  json_response(400, [
-    'ok' => false,
-    'error' => 'Turnstile validation failed. Please try again.',
-    'turnstile_reset' => true
+$is_test_domain = str_ends_with($_SERVER['HTTP_HOST'] ?? '', '.test');
+
+if (!$is_test_domain) {
+  if ($turnstile_token === '') {
+    json_response(400, [
+      'ok' => false,
+      'error' => 'Turnstile validation failed. Please try again.',
+      'turnstile_reset' => true
+    ]);
+  }
+
+  $verify_payload = http_build_query([
+    'secret' => $config['turnstile_secret'],
+    'response' => $turnstile_token,
+    'remoteip' => $_SERVER['REMOTE_ADDR'] ?? ''
   ]);
-}
 
-$verify_payload = http_build_query([
-  'secret' => $config['turnstile_secret'],
-  'response' => $turnstile_token,
-  'remoteip' => $_SERVER['REMOTE_ADDR'] ?? ''
-]);
+  $verify_ch = curl_init('https://challenges.cloudflare.com/turnstile/v0/siteverify');
+  curl_setopt($verify_ch, CURLOPT_POST, true);
+  curl_setopt($verify_ch, CURLOPT_POSTFIELDS, $verify_payload);
+  curl_setopt($verify_ch, CURLOPT_RETURNTRANSFER, true);
+  $verify_result = curl_exec($verify_ch);
+  $verify_http = curl_getinfo($verify_ch, CURLINFO_HTTP_CODE);
+  curl_close($verify_ch);
 
-$verify_ch = curl_init('https://challenges.cloudflare.com/turnstile/v0/siteverify');
-curl_setopt($verify_ch, CURLOPT_POST, true);
-curl_setopt($verify_ch, CURLOPT_POSTFIELDS, $verify_payload);
-curl_setopt($verify_ch, CURLOPT_RETURNTRANSFER, true);
-$verify_result = curl_exec($verify_ch);
-$verify_http = curl_getinfo($verify_ch, CURLINFO_HTTP_CODE);
-curl_close($verify_ch);
-
-$verify_data = json_decode($verify_result ?: '', true);
-if ($verify_http !== 200 || empty($verify_data['success'])) {
-  json_response(400, [
-    'ok' => false,
-    'error' => 'Spam protection check failed. Please try again.',
-    'turnstile_reset' => true
-  ]);
+  $verify_data = json_decode($verify_result ?: '', true);
+  if ($verify_http !== 200 || empty($verify_data['success'])) {
+    json_response(400, [
+      'ok' => false,
+      'error' => 'Spam protection check failed. Please try again.',
+      'turnstile_reset' => true
+    ]);
+  }
 }
 
 $subject_template = trim($config['email_subject'] ?? '');
